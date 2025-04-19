@@ -3,10 +3,13 @@ import streamlit as st
 from difflib import SequenceMatcher
 import pandas as pd
 
-st.set_page_config(page_title="Delegation Assistant", layout="centered")
+st.set_page_config(page_title="Delegation Assistant", layout="wide")
 
+# Logo and header
+st.image("https://raw.githubusercontent.com/Jakeeberkk/branding-assets/main/expedited-entrepreneur-logo.png", width=200)
 st.title("Delegation Assistant Tool")
 
+# --- Constants ---
 default_strengths = [
     "Task prioritization", "Calendar & meeting management", "CRM usage", "Invoicing & payment follow-up",
     "Vendor communication", "Managing inbox", "Taking notes during meetings", "Creating SOPs",
@@ -24,8 +27,17 @@ default_weaknesses = [
     "Disorganized digital workspace", "Doesn’t document processes", "Uncomfortable giving or receiving feedback"
 ]
 
-skill_categories = ["All", "Admin", "Sales", "Creative", "Technical", "Logistics", "Finance", "Customer Service"]
+category_colors = {
+    "Admin": "#e0e0e0",
+    "Sales": "#d0e8ff",
+    "Creative": "#fddde6",
+    "Technical": "#e6f2ff",
+    "Logistics": "#fff3cd",
+    "Finance": "#e2f0cb",
+    "Customer Service": "#fdebd0"
+}
 
+# --- Session State ---
 if "employees" not in st.session_state:
     st.session_state.employees = []
 if "tasks" not in st.session_state:
@@ -33,6 +45,7 @@ if "tasks" not in st.session_state:
 if "delegation_history" not in st.session_state:
     st.session_state.delegation_history = []
 
+# --- Sidebar Controls ---
 st.sidebar.title("Controls")
 if st.sidebar.button("Clear Employees"):
     st.session_state.employees = []
@@ -44,14 +57,13 @@ if st.sidebar.button("Reset Everything"):
     st.session_state.delegation_history = []
     st.sidebar.info("Data cleared. Please refresh the page.")
 
+# --- Employee Form ---
 st.header("1. Add Employee")
 with st.form("employee_form"):
     name = st.text_input("Name")
     role = st.text_input("Role")
     strengths = st.multiselect("Strengths", default_strengths)
-    ratings = {}
-    for s in strengths:
-        ratings[s] = st.slider(f"Skill Level for '{s}'", 1, 5, 5)
+    ratings = {s: st.slider(f"Skill Level for '{s}'", 1, 5, 5) for s in strengths}
     custom_strength = st.text_input("Custom Strength (optional)")
     weaknesses = st.multiselect("Weaknesses", default_weaknesses)
     custom_weakness = st.text_input("Custom Weakness (optional)")
@@ -68,18 +80,22 @@ with st.form("employee_form"):
         })
         st.success(f"Added employee: {name}")
 
+# --- Display Employees in Card Style ---
 if st.session_state.employees:
     st.subheader("Current Employees")
     for emp in st.session_state.employees:
-        st.markdown(f"**{emp['name']}** – {emp['role']}")
-        st.markdown("**Strengths:**")
-        for s, r in emp["strengths"].items():
-            st.markdown(f"- {s.title()} (Skill: {r}/5)")
-        if emp["weaknesses"]:
-            st.markdown("**Weaknesses:**")
-            for w in emp["weaknesses"]:
-                st.markdown(f"- {w.title()}")
+        with st.container():
+            st.markdown(f"**{emp['name']}** – {emp['role']}")
+            st.markdown("**Strengths:**")
+            for s, r in emp["strengths"].items():
+                st.markdown(f"- {s.title()} (Skill: {r}/5)")
+            if emp["weaknesses"]:
+                st.markdown("**Weaknesses:**")
+                for w in emp["weaknesses"]:
+                    st.markdown(f"- {w.title()}")
+            st.markdown("---")
 
+# --- Export Employees ---
 def convert_employees_to_csv():
     data = []
     for emp in st.session_state.employees:
@@ -101,11 +117,12 @@ if st.session_state.employees:
         mime="text/csv"
     )
 
+# --- Task Input ---
 st.header("2. Add Task")
 with st.form("task_form"):
     task_desc = st.text_input("Task Description")
     task_time = st.number_input("Time Spent (in minutes)", min_value=1, step=1)
-    task_category = st.selectbox("Category", skill_categories[1:])
+    task_category = st.selectbox("Category", list(category_colors.keys()))
     delegatable = st.radio("Would you like to delegate this task?", ("Yes", "No"))
     task_submitted = st.form_submit_button("Add Task")
 
@@ -118,11 +135,21 @@ with st.form("task_form"):
         })
         st.success(f"Added task: {task_desc}")
 
+# --- Display Tasks as Cards ---
 if st.session_state.tasks:
     st.subheader("Current Tasks")
     for task in st.session_state.tasks:
-        st.markdown(f"**{task['description']}** – {task['time_spent']} mins – Delegatable: {task['delegatable']} – Category: {task['category']}")
+        bg = category_colors.get(task["category"], "#f0f0f0")
+        st.markdown(
+            f"<div style='background-color:{bg}; padding: 12px; border-radius: 8px; margin-bottom: 10px;'>"
+            f"<strong>{task['description']}</strong><br>"
+            f"<em>Time:</em> {task['time_spent']} mins<br>"
+            f"<em>Category:</em> {task['category']}<br>"
+            f"<em>Delegatable:</em> {task['delegatable']}</div>",
+            unsafe_allow_html=True
+        )
 
+# --- Matching Logic ---
 def get_similarity(task_desc, strength):
     return SequenceMatcher(None, task_desc.lower(), strength).ratio()
 
@@ -141,18 +168,15 @@ def find_best_match(task_desc, employees):
     best_score = sorted_scores[0][1] if sorted_scores else 0
     return best_match, best_score
 
+# --- Run Delegation Match ---
 st.header("3. Run Delegation Match")
-
-selected_category = st.selectbox("Filter tasks by category", skill_categories)
 if st.button("Run Match"):
     st.session_state.delegation_history.clear()
-    filtered_tasks = [t for t in st.session_state.tasks if selected_category == "All" or t["category"] == selected_category]
-
-    for task in filtered_tasks:
+    for task in st.session_state.tasks:
         if task["delegatable"]:
             match, score = find_best_match(task["description"], st.session_state.employees)
             if match:
-                st.success(f"'{task['description']}' → {match['name']} ({match['role']}) – Confidence: {round(score * 100)}%")
+                st.success(f"'{task['description']}' → {match['name']} – Confidence: {round(score * 100)}%")
                 st.session_state.delegation_history.append({
                     "Task": task["description"],
                     "Assigned To": match["name"],
@@ -163,6 +187,7 @@ if st.button("Run Match"):
         else:
             st.info(f"'{task['description']}' is not marked for delegation.")
 
+# --- Delegation History Log ---
 if st.session_state.delegation_history:
     st.subheader("📚 Delegation History Log")
     df_history = pd.DataFrame(st.session_state.delegation_history)
