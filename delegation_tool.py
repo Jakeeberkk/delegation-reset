@@ -16,6 +16,14 @@ default_strengths = [
     "Cross-functional coordination", "File and folder organization", "Research & summarizing information"
 ]
 
+default_weaknesses = [
+    "Easily overwhelmed with multi-tasking", "Avoids confrontation or client follow-up", "Not detail-oriented",
+    "Struggles with written communication", "Doesn’t enjoy phone calls", "Gets distracted easily",
+    "Avoids complex spreadsheets or numbers", "Uncomfortable with tech tools or new software",
+    "Poor time estimation", "Doesn’t take initiative", "Slow response time", "Struggles with follow-through",
+    "Disorganized digital workspace", "Doesn’t document processes", "Uncomfortable giving or receiving feedback"
+]
+
 skill_categories = ["All", "Admin", "Sales", "Creative", "Technical", "Logistics", "Finance", "Customer Service"]
 
 if "employees" not in st.session_state:
@@ -44,13 +52,19 @@ with st.form("employee_form"):
     ratings = {}
     for s in strengths:
         ratings[s] = st.slider(f"Skill Level for '{s}'", 1, 5, 5)
+    custom_strength = st.text_input("Custom Strength (optional)")
+    weaknesses = st.multiselect("Weaknesses", default_weaknesses)
+    custom_weakness = st.text_input("Custom Weakness (optional)")
     submitted = st.form_submit_button("Add Employee")
 
     if submitted and name:
+        all_strengths = strengths + ([custom_strength] if custom_strength else [])
+        all_weaknesses = weaknesses + ([custom_weakness] if custom_weakness else [])
         st.session_state.employees.append({
             "name": name,
             "role": role,
-            "strengths": {s.strip().lower(): ratings[s] for s in strengths}
+            "strengths": {s.strip().lower(): ratings.get(s, 5) for s in all_strengths},
+            "weaknesses": [w.strip().lower() for w in all_weaknesses]
         })
         st.success(f"Added employee: {name}")
 
@@ -58,18 +72,24 @@ if st.session_state.employees:
     st.subheader("Current Employees")
     for emp in st.session_state.employees:
         st.markdown(f"**{emp['name']}** – {emp['role']}")
-        st.markdown("**Strengths & Ratings:**")
+        st.markdown("**Strengths:**")
         for s, r in emp["strengths"].items():
             st.markdown(f"- {s.title()} (Skill: {r}/5)")
+        if emp["weaknesses"]:
+            st.markdown("**Weaknesses:**")
+            for w in emp["weaknesses"]:
+                st.markdown(f"- {w.title()}")
 
 def convert_employees_to_csv():
     data = []
     for emp in st.session_state.employees:
         strength_str = "; ".join([f"{k}:{v}" for k, v in emp["strengths"].items()])
+        weakness_str = "; ".join(emp["weaknesses"])
         data.append({
             "name": emp["name"],
             "role": emp["role"],
-            "strengths": strength_str
+            "strengths": strength_str,
+            "weaknesses": weakness_str
         })
     return pd.DataFrame(data).to_csv(index=False)
 
@@ -84,6 +104,7 @@ if st.session_state.employees:
 st.header("2. Add Task")
 with st.form("task_form"):
     task_desc = st.text_input("Task Description")
+    task_time = st.number_input("Time Spent (in minutes)", min_value=1, step=1)
     task_category = st.selectbox("Category", skill_categories[1:])
     delegatable = st.radio("Would you like to delegate this task?", ("Yes", "No"))
     task_submitted = st.form_submit_button("Add Task")
@@ -91,6 +112,7 @@ with st.form("task_form"):
     if task_submitted and task_desc:
         st.session_state.tasks.append({
             "description": task_desc.strip(),
+            "time_spent": task_time,
             "category": task_category,
             "delegatable": delegatable == "Yes"
         })
@@ -99,7 +121,7 @@ with st.form("task_form"):
 if st.session_state.tasks:
     st.subheader("Current Tasks")
     for task in st.session_state.tasks:
-        st.markdown(f"**{task['description']}** – Delegatable: {task['delegatable']} – Category: {task['category']}")
+        st.markdown(f"**{task['description']}** – {task['time_spent']} mins – Delegatable: {task['delegatable']} – Category: {task['category']}")
 
 def get_similarity(task_desc, strength):
     return SequenceMatcher(None, task_desc.lower(), strength).ratio()
@@ -140,3 +162,15 @@ if st.button("Run Match"):
                 st.warning(f"No strong match for: {task['description']}")
         else:
             st.info(f"'{task['description']}' is not marked for delegation.")
+
+if st.session_state.delegation_history:
+    st.subheader("📚 Delegation History Log")
+    df_history = pd.DataFrame(st.session_state.delegation_history)
+    st.dataframe(df_history)
+    csv = df_history.to_csv(index=False)
+    st.download_button(
+        label="📥 Download Delegation History",
+        data=csv,
+        file_name="delegation_history.csv",
+        mime="text/csv"
+    )
