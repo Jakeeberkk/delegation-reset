@@ -5,13 +5,13 @@ import pandas as pd
 
 st.set_page_config(page_title="Delegation Assistant", layout="wide")
 
-# --- Brand Header ---
+# Header
 st.markdown(
     "<h1 style='text-align: left; color: white; background-color: black; padding: 10px 20px; border-radius: 8px;'>"
     "🧠 Delegation Assistant <span style='font-size: 16px; font-weight: normal;'>&nbsp;by Expedited Entrepreneur</span>"
     "</h1>", unsafe_allow_html=True)
 
-# --- Styling ---
+# CSS styles
 st.markdown("""
 <style>
 .card {
@@ -39,58 +39,55 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- Constants ---
-default_strengths = [
-    "Task prioritization", "Calendar & meeting management", "CRM usage", "Invoicing & payment follow-up",
-    "Vendor communication", "Managing inbox", "Taking notes during meetings", "Creating SOPs",
-    "Spreadsheet building", "Data cleanup", "Travel booking", "Project tracking", "Social media scheduling",
-    "Customer follow-up", "Cold calling", "Warm lead nurturing", "Quote generation", "Order processing",
-    "Inventory tracking", "Creating reports", "Writing professional emails", "Problem-solving under pressure",
-    "Cross-functional coordination", "File and folder organization", "Research & summarizing information"
-]
-
-default_weaknesses = [
-    "Easily overwhelmed with multi-tasking", "Avoids confrontation or client follow-up", "Not detail-oriented",
-    "Struggles with written communication", "Doesn’t enjoy phone calls", "Gets distracted easily",
-    "Avoids complex spreadsheets or numbers", "Uncomfortable with tech tools or new software",
-    "Poor time estimation", "Doesn’t take initiative", "Slow response time", "Struggles with follow-through",
-    "Disorganized digital workspace", "Doesn’t document processes", "Uncomfortable giving or receiving feedback"
-]
-
+# Constants
 categories = ["Admin", "Sales", "Creative", "Technical", "Logistics", "Finance", "Customer Service"]
+default_strengths = ["CRM usage", "Email writing", "Scheduling", "Data entry", "Project management", "Lead generation"]
+default_weaknesses = ["Avoids phone calls", "Poor time management", "Dislikes spreadsheets", "Overthinks tasks"]
 
-# --- Session State ---
+# Built-in software tools and their capabilities
+software_library = {
+    "HubSpot": ["crm", "email automation", "lead tracking", "contact management"],
+    "Monday.com": ["project management", "task tracking", "workflow automation"],
+    "GoHighLevel": ["crm", "funnels", "sms automation", "lead capture"],
+    "Slack": ["team communication", "messaging", "channel updates"],
+    "Google Sheets": ["data entry", "spreadsheet", "reporting", "analysis"]
+}
+
+# State
 if "employees" not in st.session_state:
     st.session_state.employees = []
 if "tasks" not in st.session_state:
     st.session_state.tasks = []
+if "tools" not in st.session_state:
+    st.session_state.tools = []
 if "delegation_history" not in st.session_state:
     st.session_state.delegation_history = []
 
-# --- Sidebar Controls ---
+# Sidebar controls
 st.sidebar.title("Controls")
 if st.sidebar.button("Clear Employees"):
     st.session_state.employees = []
 if st.sidebar.button("Clear Tasks"):
     st.session_state.tasks = []
+if st.sidebar.button("Clear Tools"):
+    st.session_state.tools = []
 if st.sidebar.button("Reset Everything"):
     st.session_state.employees = []
     st.session_state.tasks = []
+    st.session_state.tools = []
     st.session_state.delegation_history = []
-    st.sidebar.info("All data cleared. Please refresh.")
+    st.sidebar.info("All data cleared. Please refresh the page.")
 
-# --- Add Employee ---
+# Add Employee
 st.header("1. Add Employee")
 with st.form("employee_form"):
-    name = st.text_input("Name")
+    name = st.text_input("Employee Name")
     role = st.text_input("Role")
     strengths = st.multiselect("Strengths", default_strengths)
     custom_strength = st.text_input("Custom Strength (optional)")
     weaknesses = st.multiselect("Weaknesses", default_weaknesses)
     custom_weakness = st.text_input("Custom Weakness (optional)")
-    submitted = st.form_submit_button("Add Employee")
-
-    if submitted and name:
+    if st.form_submit_button("Add Employee") and name:
         all_strengths = strengths + ([custom_strength] if custom_strength else [])
         all_weaknesses = weaknesses + ([custom_weakness] if custom_weakness else [])
         st.session_state.employees.append({
@@ -101,48 +98,28 @@ with st.form("employee_form"):
         })
         st.success(f"Added employee: {name}")
 
-# --- Employee Cards ---
-if st.session_state.employees:
-    st.subheader("Current Employees")
-    for emp in st.session_state.employees:
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        st.markdown(f"**{emp['name']}** – {emp['role']}")
-        st.markdown("**Strengths:**")
-        for s in emp["strengths"]:
-            st.markdown(f"- {s.title()}")
-        if emp["weaknesses"]:
-            st.markdown("**Weaknesses:**")
-            for w in emp["weaknesses"]:
-                st.markdown(f"- {w.title()}")
-        st.markdown("</div>", unsafe_allow_html=True)
+# Add Tool
+st.header("2. Add Software Tool")
+with st.form("tool_form"):
+    tool_name = st.selectbox("Tool", list(software_library.keys()))
+    if st.form_submit_button("Add Tool"):
+        if tool_name not in [t["name"] for t in st.session_state.tools]:
+            st.session_state.tools.append({
+                "name": tool_name,
+                "capabilities": software_library[tool_name]
+            })
+            st.success(f"Added tool: {tool_name}")
+        else:
+            st.warning(f"{tool_name} is already added.")
 
-# --- Export Employees ---
-def convert_employees_to_csv():
-    data = []
-    for emp in st.session_state.employees:
-        strength_str = "; ".join(emp["strengths"])
-        weakness_str = "; ".join(emp["weaknesses"])
-        data.append({
-            "name": emp["name"],
-            "role": emp["role"],
-            "strengths": strength_str,
-            "weaknesses": weakness_str
-        })
-    return pd.DataFrame(data).to_csv(index=False)
-
-if st.session_state.employees:
-    st.download_button("📤 Download Employee List", convert_employees_to_csv(), "employee_list.csv", "text/csv")
-
-# --- Add Task ---
-st.header("2. Add Task")
+# Add Task
+st.header("3. Add Task")
 with st.form("task_form"):
     task_desc = st.text_input("Task Description")
-    task_time = st.number_input("Time Spent (in minutes)", min_value=1, step=1)
+    task_time = st.number_input("Time Spent (minutes)", min_value=1, step=1)
     task_category = st.selectbox("Category", categories)
-    delegatable = st.radio("Would you like to delegate this task?", ("Yes", "No"))
-    task_submitted = st.form_submit_button("Add Task")
-
-    if task_submitted and task_desc:
+    delegatable = st.radio("Is this delegatable?", ("Yes", "No"))
+    if st.form_submit_button("Add Task") and task_desc:
         st.session_state.tasks.append({
             "description": task_desc.strip(),
             "time_spent": task_time,
@@ -151,61 +128,91 @@ with st.form("task_form"):
         })
         st.success(f"Added task: {task_desc}")
 
-# --- Task Cards ---
+# Display Current Data
+def display_card(title, lines):
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    st.markdown(f"**{title}**")
+    for line in lines:
+        st.markdown(line)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+if st.session_state.employees:
+    st.subheader("Current Employees")
+    for emp in st.session_state.employees:
+        lines = [f"**Role:** {emp['role']}", "**Strengths:**"] +                 [f"- {s.title()}" for s in emp["strengths"]]
+        if emp["weaknesses"]:
+            lines += ["**Weaknesses:**"] + [f"- {w.title()}" for w in emp["weaknesses"]]
+        display_card(emp['name'], lines)
+
+if st.session_state.tools:
+    st.subheader("Current Tools")
+    for tool in st.session_state.tools:
+        lines = ["**Capabilities:**"] + [f"- {cap.title()}" for cap in tool["capabilities"]]
+        display_card(tool['name'], lines)
+
 if st.session_state.tasks:
     st.subheader("Current Tasks")
     for task in st.session_state.tasks:
-        tag_class = task["category"].replace(" ", "")
-        st.markdown(f"""
-        <div class='card'>
-            <strong>{task['description']}</strong><br>
-            <em>Time:</em> {task['time_spent']} mins<br>
-            <em>Category:</em> <span class='category-pill {tag_class}'>{task['category']}</span><br>
-            <em>Delegatable:</em> {task['delegatable']}
-        </div>
-        """, unsafe_allow_html=True)
+        lines = [
+            f"**Time:** {task['time_spent']} mins",
+            f"**Category:** {task['category']}",
+            f"**Delegatable:** {task['delegatable']}"
+        ]
+        display_card(task["description"], lines)
 
-# --- Matching Logic ---
-def get_similarity(task_desc, strength):
-    return SequenceMatcher(None, task_desc.lower(), strength).ratio()
+# Matching Logic
+def get_similarity(text1, text2):
+    return SequenceMatcher(None, text1.lower(), text2.lower()).ratio()
 
-def find_best_match(task_desc, employees):
-    emp_scores = {}
-    for emp in employees:
+def find_best_match(task_desc):
+    match_pool = []
+
+    # Match to employees
+    for emp in st.session_state.employees:
         score = 0
         for s in emp["strengths"]:
-            similarity = get_similarity(task_desc, s)
-            score = max(score, similarity)
-        emp_scores[emp["name"]] = (emp, score)
+            score = max(score, get_similarity(task_desc, s))
+        match_pool.append(("employee", emp["name"], emp.get("role", ""), score))
 
-    sorted_scores = sorted(emp_scores.values(), key=lambda x: x[1], reverse=True)
-    best_match = sorted_scores[0][0] if sorted_scores and sorted_scores[0][1] > 0.4 else None
-    best_score = sorted_scores[0][1] if sorted_scores else 0
-    return best_match, best_score
+    # Match to tools
+    for tool in st.session_state.tools:
+        score = 0
+        for cap in tool["capabilities"]:
+            score = max(score, get_similarity(task_desc, cap))
+        match_pool.append(("tool", tool["name"], "", score))
 
-# --- Run Match ---
-st.header("3. Run Delegation Match")
+    match_pool.sort(key=lambda x: x[3], reverse=True)
+    return match_pool[:2]
+
+# Run Matching
+st.header("4. Run Delegation Match")
 if st.button("Run Match"):
     st.session_state.delegation_history.clear()
     for task in st.session_state.tasks:
         if task["delegatable"]:
-            match, score = find_best_match(task["description"], st.session_state.employees)
-            if match:
-                st.success(f"'{task['description']}' → {match['name']} – Confidence: {round(score * 100)}%")
+            results = find_best_match(task["description"])
+            if results:
+                primary = results[0]
+                if primary[0] == "employee":
+                    st.success(f"'{task['description']}' → {primary[1]} ({primary[2]}) – Confidence: {round(primary[3]*100)}%")
+                else:
+                    st.success(f"'{task['description']}' → Tool: {primary[1]} – Confidence: {round(primary[3]*100)}%")
+
                 st.session_state.delegation_history.append({
                     "Task": task["description"],
-                    "Assigned To": match["name"],
-                    "Confidence": f"{round(score * 100)}%"
+                    "Delegated To": primary[1],
+                    "Type": primary[0],
+                    "Confidence": f"{round(primary[3]*100)}%"
                 })
+
             else:
                 st.warning(f"No strong match for: {task['description']}")
         else:
             st.info(f"'{task['description']}' is not marked for delegation.")
 
-# --- History Log ---
+# Export History
 if st.session_state.delegation_history:
-    st.subheader("📚 Delegation History Log")
-    df_history = pd.DataFrame(st.session_state.delegation_history)
-    st.dataframe(df_history)
-    csv = df_history.to_csv(index=False)
-    st.download_button("📥 Download Delegation History", csv, "delegation_history.csv", "text/csv")
+    st.subheader("📚 Delegation History")
+    df = pd.DataFrame(st.session_state.delegation_history)
+    st.dataframe(df)
+    st.download_button("📥 Download History", df.to_csv(index=False), "delegation_history.csv", "text/csv")
