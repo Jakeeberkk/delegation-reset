@@ -11,7 +11,7 @@ st.markdown(
     "🧠 Delegation Assistant <span style='font-size: 16px; font-weight: normal;'>&nbsp;by Expedited Entrepreneur</span>"
     "</h1>", unsafe_allow_html=True)
 
-# CSS styles
+# Styling
 st.markdown("""
 <style>
 .card {
@@ -41,10 +41,6 @@ st.markdown("""
 
 # Constants
 categories = ["Admin", "Sales", "Creative", "Technical", "Logistics", "Finance", "Customer Service"]
-default_strengths = ["CRM usage", "Email writing", "Scheduling", "Data entry", "Project management", "Lead generation"]
-default_weaknesses = ["Avoids phone calls", "Poor time management", "Dislikes spreadsheets", "Overthinks tasks"]
-
-# Built-in software tools and their capabilities
 software_library = {
     "HubSpot": ["crm", "email automation", "lead tracking", "contact management"],
     "Monday.com": ["project management", "task tracking", "workflow automation"],
@@ -53,32 +49,26 @@ software_library = {
     "Google Sheets": ["data entry", "spreadsheet", "reporting", "analysis"]
 }
 
-# State
-if "employees" not in st.session_state:
-    st.session_state.employees = []
-if "tasks" not in st.session_state:
-    st.session_state.tasks = []
-if "tools" not in st.session_state:
-    st.session_state.tools = []
-if "delegation_history" not in st.session_state:
-    st.session_state.delegation_history = []
+# Default strengths/weaknesses
+default_strengths = ["CRM usage", "Email writing", "Scheduling", "Data entry", "Project management", "Lead generation"]
+default_weaknesses = ["Avoids phone calls", "Poor time management", "Dislikes spreadsheets", "Overthinks tasks"]
 
-# Sidebar controls
+# Session state
+for key in ["employees", "tools", "tasks", "delegation_history"]:
+    if key not in st.session_state:
+        st.session_state[key] = []
+
+# Sidebar
 st.sidebar.title("Controls")
-if st.sidebar.button("Clear Employees"):
-    st.session_state.employees = []
-if st.sidebar.button("Clear Tasks"):
-    st.session_state.tasks = []
-if st.sidebar.button("Clear Tools"):
-    st.session_state.tools = []
+if st.sidebar.button("Clear Employees"): st.session_state.employees = []
+if st.sidebar.button("Clear Tools"): st.session_state.tools = []
+if st.sidebar.button("Clear Tasks"): st.session_state.tasks = []
 if st.sidebar.button("Reset Everything"):
-    st.session_state.employees = []
-    st.session_state.tasks = []
-    st.session_state.tools = []
-    st.session_state.delegation_history = []
+    for key in st.session_state:
+        st.session_state[key] = []
     st.sidebar.info("All data cleared. Please refresh the page.")
 
-# Add Employee
+# Section 1: Add Employee
 st.header("1. Add Employee")
 with st.form("employee_form"):
     name = st.text_input("Employee Name")
@@ -98,7 +88,7 @@ with st.form("employee_form"):
         })
         st.success(f"Added employee: {name}")
 
-# Add Tool
+# Section 2: Add Software Tool
 st.header("2. Add Software Tool")
 with st.form("tool_form"):
     tool_name = st.selectbox("Tool", list(software_library.keys()))
@@ -112,7 +102,7 @@ with st.form("tool_form"):
         else:
             st.warning(f"{tool_name} is already added.")
 
-# Add Task
+# Section 3: Add Task
 st.header("3. Add Task")
 with st.form("task_form"):
     task_desc = st.text_input("Task Description")
@@ -128,7 +118,7 @@ with st.form("task_form"):
         })
         st.success(f"Added task: {task_desc}")
 
-# Display Current Data
+# Card rendering
 def display_card(title, lines):
     st.markdown("<div class='card'>", unsafe_allow_html=True)
     st.markdown(f"**{title}**")
@@ -136,6 +126,7 @@ def display_card(title, lines):
         st.markdown(line)
     st.markdown("</div>", unsafe_allow_html=True)
 
+# Current data
 if st.session_state.employees:
     st.subheader("Current Employees")
     for emp in st.session_state.employees:
@@ -160,31 +151,24 @@ if st.session_state.tasks:
         ]
         display_card(task["description"], lines)
 
-# Matching Logic
+# Matching logic
 def get_similarity(text1, text2):
     return SequenceMatcher(None, text1.lower(), text2.lower()).ratio()
 
 def find_best_match(task_desc):
     match_pool = []
-
-    # Match to employees
     for emp in st.session_state.employees:
-        score = 0
-        for s in emp["strengths"]:
-            score = max(score, get_similarity(task_desc, s))
+        score = max((get_similarity(task_desc, s) for s in emp["strengths"]), default=0)
         match_pool.append(("employee", emp["name"], emp.get("role", ""), score))
 
-    # Match to tools
     for tool in st.session_state.tools:
-        score = 0
-        for cap in tool["capabilities"]:
-            score = max(score, get_similarity(task_desc, cap))
+        score = max((get_similarity(task_desc, cap) for cap in tool["capabilities"]), default=0)
         match_pool.append(("tool", tool["name"], "", score))
 
     match_pool.sort(key=lambda x: x[3], reverse=True)
     return match_pool[:2]
 
-# Run Matching
+# Section 4: Run Match
 st.header("4. Run Delegation Match")
 if st.button("Run Match"):
     st.session_state.delegation_history.clear()
@@ -193,18 +177,14 @@ if st.button("Run Match"):
             results = find_best_match(task["description"])
             if results:
                 primary = results[0]
-                if primary[0] == "employee":
-                    st.success(f"'{task['description']}' → {primary[1]} ({primary[2]}) – Confidence: {round(primary[3]*100)}%")
-                else:
-                    st.success(f"'{task['description']}' → Tool: {primary[1]} – Confidence: {round(primary[3]*100)}%")
-
+                target = f"{primary[1]} ({primary[2]})" if primary[0] == "employee" else f"Tool: {primary[1]}"
+                st.success(f"'{task['description']}' → {target} – Confidence: {round(primary[3]*100)}%")
                 st.session_state.delegation_history.append({
                     "Task": task["description"],
                     "Delegated To": primary[1],
                     "Type": primary[0],
                     "Confidence": f"{round(primary[3]*100)}%"
                 })
-
             else:
                 st.warning(f"No strong match for: {task['description']}")
         else:
